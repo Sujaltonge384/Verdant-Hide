@@ -1,9 +1,4 @@
 // server/src/controllers/orderController.js
-const Order = require('../models/Order');
-const Product = require('../models/Product');
-const User = require('../models/User');
-const asyncHandler = require('../utils/asyncHandler');
-// server/src/controllers/orderController.js
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const Order = require('../models/Order');
@@ -21,7 +16,7 @@ const getRazorpayInstance = () => {
   });
 };
 
-// Step 1: Calculate verified total & create Razorpay order (if keys exist)
+// Step 1: Calculate verified total & create Razorpay order
 exports.createPaymentOrder = asyncHandler(async (req, res) => {
   const { items } = req.body;
   if (!items || items.length === 0) {
@@ -49,7 +44,6 @@ exports.createPaymentOrder = asyncHandler(async (req, res) => {
 
   const rzp = getRazorpayInstance();
   if (!rzp) {
-    // Sandbox mode when Razorpay keys aren't configured yet
     return res.json({
       success: true,
       sandbox: true,
@@ -60,7 +54,7 @@ exports.createPaymentOrder = asyncHandler(async (req, res) => {
   }
 
   const rzpOrder = await rzp.orders.create({
-    amount: totalAmount * 100, // in paise
+    amount: totalAmount * 100,
     currency: 'INR',
     receipt: `rcpt_${Date.now()}`,
   });
@@ -74,7 +68,7 @@ exports.createPaymentOrder = asyncHandler(async (req, res) => {
   });
 });
 
-// Step 2: Verify payment & place order in MongoDB
+// Step 2: Verify payment & place order
 exports.createOrder = asyncHandler(async (req, res) => {
   const { items, shippingAddress, paymentMethod, paymentDetails } = req.body;
   if (!items || items.length === 0) {
@@ -83,7 +77,6 @@ exports.createOrder = asyncHandler(async (req, res) => {
     throw err;
   }
 
-  // Verify Razorpay signature if live keys are active & method isn't COD
   if (paymentMethod !== 'COD' && process.env.RAZORPAY_KEY_SECRET && !paymentDetails?.sandbox) {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
       paymentDetails || {};
@@ -159,92 +152,6 @@ exports.getAllOrders = asyncHandler(async (req, res) => {
   res.json({ success: true, orders });
 });
 
-exports.updateOrderStatus = asyncHandler(async (req, res) => {
-  const order = await Order.findByIdAndUpdate(
-    req.params.id,
-    { orderStatus: req.body.orderStatus },
-    { new: true, runValidators: true }
-  );
-  if (!order) {
-    const err = new Error('Order not found');
-    err.statusCode = 404;
-    throw err;
-  }
-  res.json({ success: true, order });
-});
-
-exports.createOrder = asyncHandler(async (req, res) => {
-  const { items, shippingAddress, paymentMethod } = req.body;
-  if (!items || items.length === 0) {
-    const err = new Error('No order items provided');
-    err.statusCode = 400;
-    throw err;
-  }
-
-  // Server-side price & stock verification
-  let totalAmount = 0;
-  const verifiedItems = [];
-
-  for (const item of items) {
-    const product = await Product.findById(item.productId);
-    if (!product) {
-      const err = new Error(`Product not found: ${item.productId}`);
-      err.statusCode = 404;
-      throw err;
-    }
-
-    const variant = product.variants.id(item.variantId);
-    if (!variant || variant.stock < item.quantity) {
-      const err = new Error(`Insufficient stock for ${product.name}`);
-      err.statusCode = 400;
-      throw err;
-    }
-
-    variant.stock -= item.quantity;
-    await product.save();
-
-    totalAmount += product.price * item.quantity;
-    verifiedItems.push({
-      product: product._id,
-      name: product.name,
-      colorName: variant.colorName,
-      sku: variant.sku,
-      imageUrl: variant.imageUrl,
-      price: product.price,
-      quantity: item.quantity,
-    });
-  }
-
-  const order = await Order.create({
-    user: req.user._id,
-    orderNumber: `VH-${Date.now().toString().slice(-6)}`,
-    items: verifiedItems,
-    shippingAddress,
-    totalAmount,
-    paymentMethod,
-    paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Paid',
-  });
-
-  // Clear user's cart after order
-  await User.findByIdAndUpdate(req.user._id, { $set: { cart: [] } });
-
-  res.status(201).json({ success: true, order });
-});
-
-exports.getMyOrders = asyncHandler(async (req, res) => {
-  const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
-  res.json({ success: true, orders });
-});
-
-// Admin: View All Orders
-exports.getAllOrders = asyncHandler(async (req, res) => {
-  const orders = await Order.find()
-    .populate('user', 'name email')
-    .sort({ createdAt: -1 });
-  res.json({ success: true, orders });
-});
-
-// Admin: Update Order Status
 exports.updateOrderStatus = asyncHandler(async (req, res) => {
   const order = await Order.findByIdAndUpdate(
     req.params.id,
