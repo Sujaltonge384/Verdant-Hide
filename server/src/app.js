@@ -7,15 +7,37 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
+// Trust Render's reverse proxy (required for express-rate-limit in production)
+app.set('trust proxy', 1);
+
 // 1. Security HTTP Headers
 app.disable('x-powered-by');
 app.use(helmet());
 
-// 2. Strict CORS
+// 2. Production CORS (supports Vercel production + preview URLs + localhost)
+const allowedOrigins = [
+  process.env.CLIENT_URL?.replace(/\/$/, ''),
+  'https://verdant-hide.vercel.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: [process.env.CLIENT_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'].filter(Boolean),
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app')
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 
@@ -47,11 +69,20 @@ app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 20,
-    message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' },
+    message: {
+      success: false,
+      message: 'Too many login attempts. Try again in 15 minutes.',
+    },
   })
 );
 
+// Health & Root Endpoints
+app.get('/', (req, res) =>
+  res.json({ success: true, message: 'Verdant Hide API is live' })
+);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// API Routes
 app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/v1/products', require('./routes/productRoutes'));
 app.use('/api/v1/user', require('./routes/userRoutes'));
