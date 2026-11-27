@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const connectDB = require('../config/db');
 const Product = require('../models/Product');
 const User = require('../models/User');
+const Coupon = require('../models/Coupon');
 
 const SEED_PRODUCTS = [
   {
@@ -11,17 +12,23 @@ const SEED_PRODUCTS = [
     slug: 'obsidian-flap-backpack',
     category: 'backpacks',
     categoryLabel: 'Backpacks',
-    material: '100% Apple Skin Bio-Leather',
+    material: 'Apple Skin Bio-Leather Composite',
     materialOrigin: 'Bolzano Orchard Pomace, Italy',
-    tagline: 'Structured silhouette. Zero cruelty. Crafted for daily commutes.',
+    tagline: 'Structured silhouette. Animal-free craft built for daily commutes.',
     description:
-      'Engineered from upcycled apple pomace with antique brass buckles, a padded 16-inch laptop sleeve, and weather-resistant plant-wax finish.',
+      'Engineered with an upcycled apple-pomace bio-leather exterior, antique brass-finish buckles, a padded 16-inch laptop sleeve, and organic cotton twill lining.',
     careInstructions: 'Wipe with a damp organic cloth. Condition every 6 months with plant wax.',
     dimensions: '43 cm × 30 cm × 15 cm (22L)',
     price: 5499,
     rating: 4.9,
     reviewCount: 342,
-    specs: ['Fits 16" Laptop', 'Water-Resistant Apple Leather', '22L Capacity', 'Antique Brass Hardware'],
+    specs: ['Fits 16" Laptop', 'Water-Resistant Exterior', '22L Capacity', 'Antique Brass Hardware'],
+    componentBreakdown: {
+      exterior: 'Upcycled apple-pomace bio-leather composite (supplier-attributed)',
+      backing: 'Recycled polyester & cotton textile backing',
+      lining: '100% organic cotton twill',
+      hardware: 'Brushed zinc-alloy brass finish & recycled-tape zippers',
+    },
     featuredInShowcase: true,
     displayOrder: 1,
     variants: [
@@ -86,17 +93,23 @@ const SEED_PRODUCTS = [
     slug: 'cognac-weekender-duffle',
     category: 'travel-bags',
     categoryLabel: 'Travel Bags',
-    material: '100% Organic Cactus Leather',
+    material: 'Organic Cactus Bio-Leather',
     materialOrigin: 'Zacatecas Nopal Farms, Mexico',
     tagline: 'Built for 48-hour escapes with supple cactus-grain warmth.',
     description:
-      'Hand-stitched from Mexican Nopal cactus leather. Features reinforced rolled handles, detachable shoulder strap, and cabin-compliant proportions.',
+      'Crafted with a Nopal cactus bio-leather exterior, reinforced rolled handles, detachable shoulder strap, and cabin-compliant proportions.',
     careInstructions: 'Keep out of prolonged direct heat. Buff gently with dry microfiber.',
     dimensions: '52 cm × 28 cm × 26 cm (42L)',
     price: 7999,
     rating: 4.9,
     reviewCount: 218,
-    specs: ['42L Cabin Size', 'Nopal Cactus Leather', 'Organic Cotton Lining', 'Detachable Strap'],
+    specs: ['42L Cabin Size', 'Nopal Cactus Exterior', 'Organic Cotton Lining', 'Detachable Strap'],
+    componentBreakdown: {
+      exterior: 'Nopal prickly-pear cactus bio-leather composite with protective topcoat',
+      backing: 'Woven cotton/polyester structural backing',
+      lining: '100% organic cotton canvas',
+      hardware: 'Solid brass-finish rivets, D-rings & metal zip',
+    },
     featuredInShowcase: true,
     displayOrder: 2,
     variants: [
@@ -162,7 +175,7 @@ const SEED_PRODUCTS = [
     category: 'travel-bags',
     categoryLabel: 'Travel Bags',
     material: 'Pineapple & Cork Composite Leather',
-    materialOrigin: 'Regenerative Pineapple Harvests',
+    materialOrigin: 'Regenerative Pineapple Harvests & Portugal Cork',
     tagline: 'Vintage trunk heritage reimagined in ultra-lightweight bio-leather.',
     description:
       '360-degree silent spinner wheels paired with midnight pineapple-fiber panels, espresso bio-leather corner guards, and TSA-approved locks.',
@@ -172,13 +185,19 @@ const SEED_PRODUCTS = [
     rating: 4.8,
     reviewCount: 164,
     specs: ['360° Silent Wheels', 'Piñatex & Cork Trim', 'TSA Lock', 'Telescopic Handle'],
+    componentBreakdown: {
+      exterior: 'Pineapple leaf non-woven fiber composite with PU protective finish & cork trim',
+      backing: 'Lightweight reinforced polycarbonate trunk frame',
+      lining: 'Recycled rPET & cotton interior divider',
+      hardware: 'Anodized aluminum telescopic handle & TSA lock',
+    },
     featuredInShowcase: true,
     displayOrder: 3,
     variants: [
       {
         colorName: 'Midnight Navy & Espresso',
         variantTitle: 'Voyager Trunk — Midnight Navy',
-        variantNote: 'Deep oceanic navy shell framed with espresso cactus-leather corner armor.',
+        variantNote: 'Deep oceanic navy shell framed with espresso bio-leather corner armor.',
         colorHex: '#203254',
         imageUrl: '/images/suitcase.png',
         sku: 'VH-TR-NVY',
@@ -236,17 +255,23 @@ const SEED_PRODUCTS = [
     slug: 'heritage-satchel-briefcase',
     category: 'handbags',
     categoryLabel: 'Handbags & Satchels',
-    material: '100% Organic Cactus Leather',
+    material: 'Organic Cactus Bio-Leather',
     materialOrigin: 'Zacatecas Nopal Farms, Mexico',
     tagline: 'Boardroom authority meets conscious plant-based craftsmanship.',
     description:
-      'Sleek full-flap messenger briefcase with brushed brass buckle, document dividers, and rich distressed chestnut grain that ages gracefully.',
+      'Sleek full-flap messenger briefcase with brushed brass buckle, padded document dividers, and rich distressed chestnut grain.',
     careInstructions: 'Spot clean with damp cloth. Avoid soaking seams.',
     dimensions: '39 cm × 29 cm × 9 cm',
     price: 6299,
     rating: 4.9,
     reviewCount: 289,
     specs: ['Fits 15" MacBook', 'Scratch-Resistant Grain', 'Convertible Strap', 'Brass Buckle'],
+    componentBreakdown: {
+      exterior: 'Nopal cactus bio-leather composite with textured grain finish',
+      backing: 'Cotton-poly laminated reinforcement backing',
+      lining: '80% hemp / 20% lyocell woven interior',
+      hardware: 'Brushed brass buckle & detachable swivel hooks',
+    },
     featuredInShowcase: true,
     displayOrder: 4,
     variants: [
@@ -322,6 +347,12 @@ const SEED_PRODUCTS = [
     rating: 5.0,
     reviewCount: 410,
     specs: ['RFID Protected', '6 Card Slots + Coin Zip', 'Ultra-Slim 1.2cm', 'Corn Bio-Leather'],
+    componentBreakdown: {
+      exterior: 'Non-GMO corn bio-polyol composite & apple bio-leather trim',
+      backing: 'Microfiber textile support layer',
+      lining: 'RFID-shielded woven cotton-nylon blend',
+      hardware: 'Micro-tooth brass coin zipper',
+    },
     featuredInShowcase: true,
     displayOrder: 5,
     variants: [
@@ -381,13 +412,12 @@ const SEED_PRODUCTS = [
       },
     ],
   },
-  // Additional Catalog Products (for richer Collection page)
   {
     name: 'Nopal Structured Tote',
     slug: 'nopal-structured-tote',
     category: 'handbags',
     categoryLabel: 'Handbags & Satchels',
-    material: '100% Organic Cactus Leather',
+    material: 'Organic Cactus Bio-Leather',
     materialOrigin: 'Zacatecas Nopal Farms, Mexico',
     tagline: 'Architectural everyday tote crafted for effortless carry.',
     description: 'Generous interior with zippered tech pocket and reinforced cactus-leather shoulder straps.',
@@ -397,6 +427,12 @@ const SEED_PRODUCTS = [
     rating: 4.8,
     reviewCount: 95,
     specs: ['Fits 15" Laptop', 'Magnetic Snap Top', 'Internal Zip Pocket'],
+    componentBreakdown: {
+      exterior: 'Nopal cactus bio-leather composite',
+      backing: 'Organic cotton backing',
+      lining: '100% organic cotton twill',
+      hardware: 'Concealed magnetic snap & alloy rings',
+    },
     featuredInShowcase: false,
     displayOrder: 6,
     variants: [
@@ -432,7 +468,13 @@ const SEED_PRODUCTS = [
     price: 6499,
     rating: 4.9,
     reviewCount: 112,
-    specs: ['Expandable 26L', 'Waterproof Zippers', '16" Laptop Access'],
+    specs: ['Expandable 26L', 'Water-Resistant Zippers', '16" Laptop Access'],
+    componentBreakdown: {
+      exterior: 'Apple-pomace bio-leather & Portuguese natural cork trim',
+      backing: 'Recycled polyester weave',
+      lining: 'Recycled rPET ripstop lining',
+      hardware: 'Anodized aluminum G-hook & coated zips',
+    },
     featuredInShowcase: false,
     displayOrder: 7,
     variants: [
@@ -461,6 +503,12 @@ const SEED_PRODUCTS = [
     rating: 4.9,
     reviewCount: 148,
     specs: ['RFID Safe', 'Fits All Passports', 'Pen Loop'],
+    componentBreakdown: {
+      exterior: 'Non-GMO corn bio-polyol composite',
+      backing: 'Recycled microfiber backing',
+      lining: 'RFID-shielded textile lining',
+      hardware: 'Hidden neodymium snap closure',
+    },
     featuredInShowcase: false,
     displayOrder: 8,
     variants: [
@@ -480,8 +528,10 @@ async function seed() {
   await connectDB();
   await Product.deleteMany({});
   await User.deleteMany({});
+  await Coupon.deleteMany({});
 
   await Product.insertMany(SEED_PRODUCTS);
+
   await User.create({
     name: 'Verdant Admin',
     email: 'admin@verdanthide.com',
@@ -489,7 +539,16 @@ async function seed() {
     role: 'admin',
   });
 
-  console.log('Seeded 8 luxury products (with 3-4 variants) + Admin user!');
+  await Coupon.create({
+    code: 'EARTH10',
+    discountType: 'PERCENT',
+    value: 10,
+    minOrderAmount: 1999,
+    maxDiscount: 1500,
+    expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+  });
+
+  console.log('Seeded 8 luxury products, Admin user, and EARTH10 coupon!');
   process.exit(0);
 }
 

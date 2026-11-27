@@ -220,16 +220,16 @@ function ProductDetailContent() {
                     </div>
                   </div>
                 )}
-                {activeTab === 'care' && (
-                  <div className="space-y-2">
-                    <p>
-                      <strong>Origin:</strong> {product.materialOrigin}
-                    </p>
-                    <p>
-                      <strong>Care:</strong> {product.careInstructions}
-                    </p>
-                  </div>
-                )}
+               {activeTab === 'care' && (
+  <div className="space-y-2.5 text-xs sm:text-sm">
+    <p><strong>Exterior:</strong> {product.componentBreakdown?.exterior || product.material}</p>
+    <p><strong>Backing:</strong> {product.componentBreakdown?.backing || 'Textile composite backing'}</p>
+    <p><strong>Lining:</strong> {product.componentBreakdown?.lining || 'Organic cotton twill'}</p>
+    <p><strong>Hardware:</strong> {product.componentBreakdown?.hardware || 'Brass-finish alloy & zips'}</p>
+    <p><strong>Origin:</strong> {product.materialOrigin}</p>
+    <p><strong>Care:</strong> {product.careInstructions}</p>
+  </div>
+)}
                 {activeTab === 'warranty' && (
                   <div className="flex items-start gap-3">
                     <ShieldCheck className="h-6 w-6 text-[#5A6344] shrink-0" />

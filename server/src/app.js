@@ -87,7 +87,9 @@ app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/v1/products', require('./routes/productRoutes'));
 app.use('/api/v1/user', require('./routes/userRoutes'));
 app.use('/api/v1/orders', require('./routes/orderRoutes'));
-
+app.use('/api/v1/admin', require('./routes/adminRoutes'));
+app.use('/api/v1/coupons', require('./routes/couponRoutes'));
+app.use('/api/v1/support', require('./routes/supportRoutes'));
 app.use(errorHandler);
 
 module.exports = app;

@@ -4,7 +4,16 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Script from 'next/script';
-import { CheckCircle2, Lock, CreditCard, Banknote, AlertCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  Lock,
+  CreditCard,
+  Banknote,
+  AlertCircle,
+  Tag,
+  X,
+  MapPin,
+} from 'lucide-react';
 import { apiFetch } from '@/services/api';
 import { useStore } from '@/context/StoreContext';
 import Navbar from '@/components/Navbar';
@@ -21,16 +30,22 @@ export default function CheckoutPage() {
 
   const [address, setAddress] = useState({
     fullName: user?.name || '',
-    phone: '',
+    phone: user?.phone || '',
     addressLine: '',
     city: '',
     state: '',
     pincode: '',
   });
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CARD' | 'COD'>('UPI');
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [agreedToPolicy, setAgreedToPolicy] = useState(false);
+
   const [error, setError] = useState('');
   const [placing, setPlacing] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<any>(null);
+
+  const finalTotal = Math.max(0, cartTotal - (appliedCoupon?.discount || 0));
 
   const validateAddress = () => {
     if (address.fullName.trim().length < 2) return 'Please enter your full name.';
@@ -40,6 +55,25 @@ export default function CheckoutPage() {
     if (!address.city.trim() || !address.state.trim()) return 'City and State are required.';
     if (!/^\d{6}$/.test(address.pincode)) return 'Enter a valid 6-digit pincode.';
     return null;
+  };
+
+  const handleApplyCoupon = async () => {
+    setError('');
+    if (!couponInput.trim()) return;
+    try {
+      const res = await apiFetch<{ code: string; discount: number; message: string }>(
+        '/coupons/validate',
+        {
+          method: 'POST',
+          body: JSON.stringify({ code: couponInput, subtotal: cartTotal }),
+        }
+      );
+      setAppliedCoupon({ code: res.code, discount: res.discount });
+      showToast(res.message, 'success');
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      showToast(err.message || 'Invalid promo code', 'error');
+    }
   };
 
   const finalizeOrder = async (paymentDetails?: any) => {
@@ -52,6 +86,7 @@ export default function CheckoutPage() {
       shippingAddress: address,
       paymentMethod,
       paymentDetails,
+      couponCode: appliedCoupon?.code || '',
     };
 
     const res = await apiFetch<{ order: any }>('/orders', {
@@ -80,6 +115,11 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!agreedToPolicy) {
+      setError('Please accept the Terms of Sale, Privacy Notice, and Return Policy.');
+      return;
+    }
+
     setPlacing(true);
     try {
       if (paymentMethod === 'COD') {
@@ -87,7 +127,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Create Razorpay order on Express server
+      // Create Razorpay order on Express server (including coupon discount)
       const payOrder = await apiFetch<{
         sandbox: boolean;
         amount: number;
@@ -101,12 +141,12 @@ export default function CheckoutPage() {
             variantId: i.variantId,
             quantity: i.quantity,
           })),
+          couponCode: appliedCoupon?.code || '',
         }),
       });
 
       const rzpKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
       if (payOrder.sandbox || !rzpKey || !window.Razorpay) {
-        // Sandbox confirmation when Razorpay keys aren't added yet
         await finalizeOrder({ sandbox: true, razorpay_order_id: payOrder.razorpayOrderId });
         return;
       }
@@ -143,22 +183,36 @@ export default function CheckoutPage() {
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <Navbar />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 pt-28 pb-20 px-6 md:px-12">
+      <main className="mx-auto w-full max-w-6xl flex-1 pt-28 pb-20 px-4 sm:px-6 md:px-12">
         {placedOrder ? (
-          <div className="mx-auto max-w-xl rounded-3xl bg-white p-10 text-center shadow-lg space-y-5">
+          <div className="mx-auto max-w-xl rounded-3xl bg-white p-8 sm:p-10 text-center shadow-lg space-y-5">
             <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" />
             <h1 className="text-3xl font-black">Order Confirmed</h1>
             <p className="text-sm text-neutral-600">
-              Thank you for choosing cruelty-free craft. Your order{' '}
+              Thank you for choosing conscious craft. Your order{' '}
               <strong className="text-black font-mono">{placedOrder.orderNumber}</strong> is now{' '}
               <strong>{placedOrder.orderStatus}</strong>.
             </p>
             <div className="rounded-2xl bg-[#F6F4EF] p-4 text-left text-xs space-y-1">
-              <p><strong>Deliver To:</strong> {placedOrder.shippingAddress.fullName}</p>
-              <p>{placedOrder.shippingAddress.addressLine}, {placedOrder.shippingAddress.city} - {placedOrder.shippingAddress.pincode}</p>
-              <p><strong>Total Paid:</strong> ₹{placedOrder.totalAmount.toLocaleString('en-IN')} ({placedOrder.paymentMethod})</p>
+              <p>
+                <strong>Deliver To:</strong> {placedOrder.shippingAddress.fullName}
+              </p>
+              <p>
+                {placedOrder.shippingAddress.addressLine}, {placedOrder.shippingAddress.city} -{' '}
+                {placedOrder.shippingAddress.pincode}
+              </p>
+              {placedOrder.couponCode && (
+                <p className="text-emerald-700 font-semibold">
+                  Promo Applied ({placedOrder.couponCode}): −₹
+                  {placedOrder.discountAmount.toLocaleString('en-IN')}
+                </p>
+              )}
+              <p>
+                <strong>Total Payable:</strong> ₹
+                {placedOrder.totalAmount.toLocaleString('en-IN')} ({placedOrder.paymentMethod})
+              </p>
             </div>
-            <div className="flex justify-center gap-4 pt-2">
+            <div className="flex flex-wrap justify-center gap-4 pt-2">
               <Link
                 href="/orders"
                 className="rounded-full bg-[#16171A] px-7 py-3.5 text-xs font-bold uppercase tracking-widest text-white"
@@ -185,7 +239,7 @@ export default function CheckoutPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
-            {/* Left: Shipping Address & Payment */}
+            {/* Left: Shipping Address, Payment & Consent */}
             <form onSubmit={handlePlaceOrder} className="lg:col-span-7 space-y-8">
               <div>
                 <h1 className="text-3xl font-black">Checkout</h1>
@@ -214,8 +268,43 @@ export default function CheckoutPage() {
 
               <section className="rounded-3xl bg-white p-6 md:p-8 shadow-xs space-y-4">
                 <h2 className="text-lg font-extrabold">1. Shipping Address</h2>
+
+                {/* 1-Click Saved Address Selector */}
+                {user?.addresses && user.addresses.length > 0 && (
+                  <div className="space-y-2 pb-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+                      Use Saved Address:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {user.addresses.map((sa: any) => (
+                        <button
+                          type="button"
+                          key={sa._id}
+                          onClick={() =>
+                            setAddress({
+                              fullName: sa.fullName,
+                              phone: sa.phone,
+                              addressLine: sa.addressLine,
+                              city: sa.city,
+                              state: sa.state,
+                              pincode: sa.pincode,
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-[#F6F4EF] px-3.5 py-1.5 text-xs font-bold hover:border-black"
+                        >
+                          <MapPin className="h-3 w-3 text-[#5A6344]" />
+                          {sa.label} ({sa.pincode})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <input
+                    id="chk-name"
+                    name="fullName"
+                    autoComplete="name"
                     required
                     value={address.fullName}
                     onChange={(e) => setAddress({ ...address, fullName: e.target.value })}
@@ -223,6 +312,9 @@ export default function CheckoutPage() {
                     className="rounded-xl border border-black/15 px-4 py-3 text-sm outline-none focus:border-black"
                   />
                   <input
+                    id="chk-phone"
+                    name="phone"
+                    autoComplete="tel"
                     required
                     value={address.phone}
                     onChange={(e) => setAddress({ ...address, phone: e.target.value })}
@@ -231,6 +323,9 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <input
+                  id="chk-addr"
+                  name="addressLine"
+                  autoComplete="street-address"
                   required
                   value={address.addressLine}
                   onChange={(e) => setAddress({ ...address, addressLine: e.target.value })}
@@ -239,6 +334,9 @@ export default function CheckoutPage() {
                 />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <input
+                    id="chk-city"
+                    name="city"
+                    autoComplete="address-level2"
                     required
                     value={address.city}
                     onChange={(e) => setAddress({ ...address, city: e.target.value })}
@@ -246,6 +344,9 @@ export default function CheckoutPage() {
                     className="rounded-xl border border-black/15 px-4 py-3 text-sm outline-none focus:border-black"
                   />
                   <input
+                    id="chk-state"
+                    name="state"
+                    autoComplete="address-level1"
                     required
                     value={address.state}
                     onChange={(e) => setAddress({ ...address, state: e.target.value })}
@@ -253,6 +354,9 @@ export default function CheckoutPage() {
                     className="rounded-xl border border-black/15 px-4 py-3 text-sm outline-none focus:border-black"
                   />
                   <input
+                    id="chk-pin"
+                    name="pincode"
+                    autoComplete="postal-code"
                     required
                     value={address.pincode}
                     onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
@@ -287,6 +391,29 @@ export default function CheckoutPage() {
                 </div>
               </section>
 
+              {/* Legal Policy Consent (Un-ticked by default per DPDP / Consumer Rules) */}
+              <label className="flex items-start gap-2.5 text-xs text-neutral-600 cursor-pointer">
+                <input
+                  id="chk-policy"
+                  name="agreedToPolicy"
+                  type="checkbox"
+                  checked={agreedToPolicy}
+                  onChange={(e) => setAgreedToPolicy(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  I agree to the{' '}
+                  <Link href="/privacy-terms" className="underline font-semibold text-black">
+                    Terms of Sale &amp; Privacy Notice
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/shipping-returns" className="underline font-semibold text-black">
+                    Shipping &amp; 14-Day Return Policy
+                  </Link>
+                  .
+                </span>
+              </label>
+
               <button
                 type="submit"
                 disabled={placing}
@@ -294,17 +421,20 @@ export default function CheckoutPage() {
               >
                 {placing
                   ? 'Processing Order...'
-                  : `Place Order — ₹${cartTotal.toLocaleString('en-IN')}`}
+                  : `Place Order — ₹${finalTotal.toLocaleString('en-IN')}`}
               </button>
             </form>
 
-            {/* Right: Order Summary */}
+            {/* Right: Order Summary + Promo Code */}
             <aside className="lg:col-span-5">
               <div className="sticky top-28 rounded-3xl bg-white p-6 md:p-8 shadow-xs space-y-5">
                 <h2 className="text-lg font-extrabold">Order Summary</h2>
                 <div className="space-y-4 max-h-80 overflow-y-auto">
                   {cart.map((item) => (
-                    <div key={`${item.productId}-${item.variantId}`} className="flex items-center gap-4">
+                    <div
+                      key={`${item.productId}-${item.variantId}`}
+                      className="flex items-center gap-4"
+                    >
                       <img
                         src={item.image}
                         alt={item.name}
@@ -322,14 +452,64 @@ export default function CheckoutPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Promo Code Input */}
+                <div className="border-t border-black/10 pt-4">
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3.5 py-2.5 text-xs font-bold text-emerald-800">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Tag className="h-3.5 w-3.5" /> {appliedCoupon.code} applied
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAppliedCoupon(null);
+                          setCouponInput('');
+                        }}
+                        aria-label="Remove promo code"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        id="chk-coupon"
+                        name="couponCode"
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value)}
+                        placeholder="Promo code (try EARTH10)"
+                        className="flex-1 rounded-xl border border-black/15 px-3.5 py-2.5 text-xs uppercase outline-none focus:border-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        className="rounded-xl bg-[#16171A] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="border-t border-black/10 pt-4 space-y-2 text-sm">
+                  <div className="flex justify-between text-neutral-500">
+                    <span>Subtotal</span>
+                    <span>₹{cartTotal.toLocaleString('en-IN')}</span>
+                  </div>
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-emerald-700 font-semibold">
+                      <span>Discount ({appliedCoupon.code})</span>
+                      <span>−₹{appliedCoupon.discount.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-neutral-500">
                     <span>Shipping</span>
                     <span className="text-emerald-700 font-semibold">Free</span>
                   </div>
-                  <div className="flex justify-between text-lg font-black pt-1">
+                  <div className="flex justify-between text-lg font-black pt-1 border-t border-black/10">
                     <span>Total</span>
-                    <span>₹{cartTotal.toLocaleString('en-IN')}</span>
+                    <span>₹{finalTotal.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               </div>

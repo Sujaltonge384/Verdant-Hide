@@ -53,6 +53,12 @@ const productSchema = new mongoose.Schema(
     featuredInShowcase: { type: Boolean, default: false },
     displayOrder: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
+    componentBreakdown: {
+    exterior: { type: String, default: 'Bio-based composite leather (supplier-attributed)' },
+    backing: { type: String, default: 'Recycled polyester / organic cotton textile backing' },
+    lining: { type: String, default: '100% organic cotton twill' },
+    hardware: { type: String, default: 'Brushed zinc-alloy brass finish & recycled zippers' },
+    },
   },
   { timestamps: true }
 );

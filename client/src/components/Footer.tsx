@@ -39,8 +39,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="max-w-sm text-sm leading-relaxed text-neutral-400">
-              Architectural carry goods crafted exclusively from regenerative cactus,
-              apple, pineapple, and corn bio-leathers. Zero animal hide. Zero plastic PVC.
+              Architectural carry goods crafted with plant-derived bio-leather exteriors (cactus, apple, pineapple & corn composites) paired with organic cotton linings and brass-finish hardware.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <span className="rounded-full border border-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#D4AF37]">
@@ -49,6 +48,11 @@ export default function Footer() {
               <span className="rounded-full border border-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-neutral-300">
                 5-Year Warranty
               </span>
+            </div>
+            <div className="flex flex-wrap gap-5">
+               <Link href="/shipping-returns" className="hover:text-white">Shipping &amp; Returns</Link>
+               <Link href="/privacy-terms" className="hover:text-white">Privacy &amp; Terms</Link>
+               <Link href="/contact" className="hover:text-white">Contact &amp; Grievance</Link>
             </div>
           </div>
 
@@ -153,6 +157,8 @@ export default function Footer() {
             <span>Cruelty-Free Certified</span>
           </div>
         </div>
+
+        
       </div>
     </footer>
   );

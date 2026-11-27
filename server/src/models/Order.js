@@ -1,6 +1,8 @@
 // server/src/models/Order.js
 const mongoose = require('mongoose');
 
+
+
 const orderItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -35,8 +37,14 @@ const orderSchema = new mongoose.Schema(
       enum: ['Placed', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
       default: 'Placed',
     },
+    courierName: { type: String, default: '' },
+    trackingNumber: { type: String, default: '' },
+    subtotalAmount: { type: Number, default: 0 },
+    couponCode: { type: String, default: '' },
+    discountAmount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
+
 
 module.exports = mongoose.model('Order', orderSchema);
