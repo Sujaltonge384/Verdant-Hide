@@ -5,6 +5,8 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
+const { calculateCouponDiscount } = require('./couponController');
+const { sendEmailSafe } = require('../utils/mailer');
 
 const getRazorpayInstance = () => {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -16,9 +18,9 @@ const getRazorpayInstance = () => {
   });
 };
 
-// Step 1: Calculate verified total & create Razorpay order
+// Step 1: Calculate verified total (with coupon) & create Razorpay order
 exports.createPaymentOrder = asyncHandler(async (req, res) => {
-  const { items } = req.body;
+  const { items, couponCode } = req.body;
   if (!items || items.length === 0) {
     const err = new Error('Your bag is empty');
     err.statusCode = 400;
@@ -42,19 +44,22 @@ exports.createPaymentOrder = asyncHandler(async (req, res) => {
     totalAmount += product.price * item.quantity;
   }
 
+  const { discount } = await calculateCouponDiscount(couponCode, totalAmount);
+  const payableAmount = Math.max(0, totalAmount - discount);
+
   const rzp = getRazorpayInstance();
   if (!rzp) {
     return res.json({
       success: true,
       sandbox: true,
-      amount: totalAmount * 100,
+      amount: payableAmount * 100,
       currency: 'INR',
       razorpayOrderId: `sandbox_order_${Date.now()}`,
     });
   }
 
   const rzpOrder = await rzp.orders.create({
-    amount: totalAmount * 100,
+    amount: payableAmount * 100,
     currency: 'INR',
     receipt: `rcpt_${Date.now()}`,
   });
@@ -68,15 +73,16 @@ exports.createPaymentOrder = asyncHandler(async (req, res) => {
   });
 });
 
-// Step 2: Verify payment & place order
+// Step 2: Verify payment, apply coupon, deduct stock & place order
 exports.createOrder = asyncHandler(async (req, res) => {
-  const { items, shippingAddress, paymentMethod, paymentDetails } = req.body;
+  const { items, shippingAddress, paymentMethod, paymentDetails, couponCode } = req.body;
   if (!items || items.length === 0) {
     const err = new Error('No order items provided');
     err.statusCode = 400;
     throw err;
   }
 
+  // 1. Verify Razorpay signature if live keys are active & payment is not COD/sandbox
   if (paymentMethod !== 'COD' && process.env.RAZORPAY_KEY_SECRET && !paymentDetails?.sandbox) {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
       paymentDetails || {};
@@ -92,6 +98,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
     }
   }
 
+  // 2. Verify products, check stock, deduct stock & calculate subtotal
   let totalAmount = 0;
   const verifiedItems = [];
 
@@ -105,7 +112,9 @@ exports.createOrder = asyncHandler(async (req, res) => {
 
     const variant = product.variants.id(item.variantId);
     if (!variant || variant.stock < item.quantity) {
-      const err = new Error(`Sorry, "${product.name}" (${variant?.colorName || ''}) is out of stock.`);
+      const err = new Error(
+        `Sorry, "${product.name}" (${variant?.colorName || ''}) is out of stock.`
+      );
       err.statusCode = 400;
       throw err;
     }
@@ -125,17 +134,38 @@ exports.createOrder = asyncHandler(async (req, res) => {
     });
   }
 
+  // 3. Apply promo code discount server-side
+  const { discount, coupon } = await calculateCouponDiscount(couponCode, totalAmount);
+  const finalAmount = Math.max(0, totalAmount - discount);
+
+  // 4. Create immutable Order record
   const order = await Order.create({
     user: req.user._id,
     orderNumber: `VH-${Date.now().toString().slice(-6)}`,
     items: verifiedItems,
     shippingAddress,
-    totalAmount,
+    subtotalAmount: totalAmount,
+    couponCode: coupon ? coupon.code : '',
+    discountAmount: discount,
+    totalAmount: finalAmount,
     paymentMethod,
     paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Paid',
   });
 
+  if (coupon) {
+    coupon.usedCount += 1;
+    await coupon.save();
+  }
+
+  // 5. Clear customer's saved cart
   await User.findByIdAndUpdate(req.user._id, { $set: { cart: [] } });
+
+  // 6. Send Order Confirmation Email (non-blocking)
+  sendEmailSafe({
+    to: req.user.email,
+    subject: `Order Confirmed ${order.orderNumber} — Verdant Hide`,
+    html: `<h2>Thank you, ${shippingAddress.fullName}!</h2><p>Your order <strong>${order.orderNumber}</strong> for <strong>₹${finalAmount.toLocaleString('en-IN')}</strong> has been confirmed.</p>`,
+  });
 
   res.status(201).json({ success: true, order });
 });
@@ -153,15 +183,29 @@ exports.getAllOrders = asyncHandler(async (req, res) => {
 });
 
 exports.updateOrderStatus = asyncHandler(async (req, res) => {
-  const order = await Order.findByIdAndUpdate(
-    req.params.id,
-    { orderStatus: req.body.orderStatus },
-    { new: true, runValidators: true }
-  );
+  const { orderStatus, courierName, trackingNumber } = req.body;
+  const update = { orderStatus };
+  if (courierName !== undefined) update.courierName = courierName;
+  if (trackingNumber !== undefined) update.trackingNumber = trackingNumber;
+
+  const order = await Order.findByIdAndUpdate(req.params.id, update, {
+    new: true,
+    runValidators: true,
+  }).populate('user', 'name email');
+
   if (!order) {
     const err = new Error('Order not found');
     err.statusCode = 404;
     throw err;
   }
+
+  if (order.user?.email) {
+    sendEmailSafe({
+      to: order.user.email,
+      subject: `Order ${order.orderNumber} Update: ${order.orderStatus}`,
+      html: `<p>Your order <strong>${order.orderNumber}</strong> is now <strong>${order.orderStatus}</strong>.${order.trackingNumber ? ` Tracking #: <strong>${order.trackingNumber}</strong>` : ''}</p>`,
+    });
+  }
+
   res.json({ success: true, order });
 });
